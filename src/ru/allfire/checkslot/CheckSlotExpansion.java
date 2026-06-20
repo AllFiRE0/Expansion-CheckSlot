@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Multimap;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -104,9 +106,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         String playerArg = null;
         String typeSlotFallback;
         
-        // Проверяем, является ли первая часть ником или плейсхолдером
-        // Известные типы: name, rawname, data, lore, lore-1...lore-30, enchants, rawenchants, 
-        // potion, rawpotion, attribute, rawattribute, durability, maxdurability
+        // Известные типы
         List<String> knownTypes = List.of("name", "rawname", "data", "lore", "enchants", 
             "rawenchants", "potion", "rawpotion", "attribute", "rawattribute", 
             "durability", "maxdurability");
@@ -122,7 +122,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                 
                 String placeholderInBrackets = params.substring(1, closeBracket);
                 playerArg = "%" + placeholderInBrackets + "%";
-                typeSlotFallback = params.substring(closeBracket + 2); // пропускаем }_
+                typeSlotFallback = params.substring(closeBracket + 2);
             } else {
                 // Это прямой ник
                 int firstUnderscore = params.indexOf('_');
@@ -151,7 +151,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         
         if (target == null || !target.isOnline()) {
-            // Парсим fallback с плейсхолдерами для viewer
             return parseInlinePlaceholders(viewer, fallback);
         }
         
@@ -200,7 +199,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
     }
     
-    // Находит индекс закрывающей скобки
     private int findClosingBracket(String str, int openPos) {
         int depth = 1;
         for (int i = openPos + 1; i < str.length(); i++) {
@@ -214,20 +212,16 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return -1;
     }
     
-    // Определяет игрока по аргументу
     private Player resolvePlayer(Player viewer, String playerArg) {
-        // Если аргумент содержит %, это плейсхолдер
         if (playerArg.contains("%")) {
             String parsed = PlaceholderAPI.setPlaceholders(viewer, playerArg);
             if (parsed == null || parsed.isEmpty()) return null;
             return Bukkit.getPlayer(parsed);
         }
         
-        // Иначе это прямой ник
         return Bukkit.getPlayer(playerArg);
     }
     
-    // Парсит {placeholder} внутри строки
     private String parseInlinePlaceholders(Player player, String text) {
         if (text == null || text.isEmpty()) return text;
         
@@ -383,7 +377,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     private String getAttributes(ItemStack item, boolean raw, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasAttributeModifiers()) {
-            Map<Attribute, AttributeModifier> attributes = meta.getAttributeModifiers();
+            Multimap<Attribute, AttributeModifier> attributes = meta.getAttributeModifiers();
             if (attributes != null && !attributes.isEmpty()) {
                 List<String> attrList = new ArrayList<>();
                 

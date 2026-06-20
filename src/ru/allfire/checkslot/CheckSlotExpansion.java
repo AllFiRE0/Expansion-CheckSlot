@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.attribute.Attribute;
@@ -16,6 +17,7 @@ import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 
 public class CheckSlotExpansion extends PlaceholderExpansion {
@@ -32,13 +34,14 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     @Override
     public String getVersion() {
-        return "1.0.0";
+        return "1.1.0";
     }
     
     @Override
     public List<String> getPlaceholders() {
         List<String> placeholders = new ArrayList<>();
         
+        // Без ника (текущий игрок)
         placeholders.add("%checkslot_name_<slot>_<fallback>%");
         placeholders.add("%checkslot_rawname_<slot>_<fallback>%");
         placeholders.add("%checkslot_data_<slot>_<fallback>%");
@@ -53,6 +56,36 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         placeholders.add("%checkslot_durability_<slot>_<fallback>%");
         placeholders.add("%checkslot_maxdurability_<slot>_<fallback>%");
         
+        // С ником
+        placeholders.add("%checkslot_<player>_name_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_rawname_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_data_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_lore_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_lore-1_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_enchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_rawenchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_potion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_rawpotion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_attribute_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_rawattribute_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_durability_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_maxdurability_<slot>_<fallback>%");
+        
+        // С плейсхолдером в {}
+        placeholders.add("%checkslot_{placeholder}_name_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_rawname_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_data_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_lore_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_lore-1_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_enchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_rawenchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_potion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_rawpotion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_attribute_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_rawattribute_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_durability_<slot>_<fallback>%");
+        placeholders.add("%checkslot_{placeholder}_maxdurability_<slot>_<fallback>%");
+        
         return placeholders;
     }
     
@@ -62,18 +95,70 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return "";
         }
         
-        Player player = p.getPlayer();
-        if (player == null) return "";
+        Player viewer = p.getPlayer();
+        if (viewer == null) return "";
         
-        // Парсим параметры: type_slot_fallback
-        String[] parts = params.split("_", 3);
+        // Определяем, есть ли ник игрока в начале
+        String firstPart = params.contains("_") ? params.substring(0, params.indexOf('_')) : params;
+        boolean hasPlayerArg = false;
+        String playerArg = null;
+        String typeSlotFallback;
+        
+        // Проверяем, является ли первая часть ником или плейсхолдером
+        // Известные типы: name, rawname, data, lore, lore-1...lore-30, enchants, rawenchants, 
+        // potion, rawpotion, attribute, rawattribute, durability, maxdurability
+        List<String> knownTypes = List.of("name", "rawname", "data", "lore", "enchants", 
+            "rawenchants", "potion", "rawpotion", "attribute", "rawattribute", 
+            "durability", "maxdurability");
+        
+        boolean firstIsType = knownTypes.contains(firstPart) || firstPart.startsWith("lore-");
+        
+        if (!firstIsType) {
+            hasPlayerArg = true;
+            if (firstPart.startsWith("{")) {
+                // Это плейсхолдер в {}
+                int closeBracket = findClosingBracket(params, 0);
+                if (closeBracket == -1) return "";
+                
+                String placeholderInBrackets = params.substring(1, closeBracket);
+                playerArg = "%" + placeholderInBrackets + "%";
+                typeSlotFallback = params.substring(closeBracket + 2); // пропускаем }_
+            } else {
+                // Это прямой ник
+                int firstUnderscore = params.indexOf('_');
+                playerArg = firstPart;
+                typeSlotFallback = params.substring(firstUnderscore + 1);
+            }
+        } else {
+            // Без ника — используем текущего игрока
+            typeSlotFallback = params;
+        }
+        
+        // Парсим type_slot_fallback
+        String[] parts = typeSlotFallback.split("_", 3);
         if (parts.length < 2) return "";
         
         String type = parts[0];
         String slotStr = parts[1];
         String fallback = parts.length > 2 ? parts[2].replace('&', '§') : "";
         
-        ItemStack item = getItemInSlot(player, slotStr);
+        // Определяем целевого игрока
+        Player target;
+        if (hasPlayerArg) {
+            target = resolvePlayer(viewer, playerArg);
+        } else {
+            target = viewer;
+        }
+        
+        if (target == null || !target.isOnline()) {
+            // Парсим fallback с плейсхолдерами для viewer
+            return parseInlinePlaceholders(viewer, fallback);
+        }
+        
+        // Парсим fallback через PlaceholderAPI если есть {}
+        fallback = parseInlinePlaceholders(target, fallback);
+        
+        ItemStack item = getItemInSlot(target, slotStr);
         if (item == null || item.getType() == Material.AIR) {
             return fallback;
         }
@@ -113,6 +198,61 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         } catch (Exception e) {
             return fallback;
         }
+    }
+    
+    // Находит индекс закрывающей скобки
+    private int findClosingBracket(String str, int openPos) {
+        int depth = 1;
+        for (int i = openPos + 1; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+    
+    // Определяет игрока по аргументу
+    private Player resolvePlayer(Player viewer, String playerArg) {
+        // Если аргумент содержит %, это плейсхолдер
+        if (playerArg.contains("%")) {
+            String parsed = PlaceholderAPI.setPlaceholders(viewer, playerArg);
+            if (parsed == null || parsed.isEmpty()) return null;
+            return Bukkit.getPlayer(parsed);
+        }
+        
+        // Иначе это прямой ник
+        return Bukkit.getPlayer(playerArg);
+    }
+    
+    // Парсит {placeholder} внутри строки
+    private String parseInlinePlaceholders(Player player, String text) {
+        if (text == null || text.isEmpty()) return text;
+        
+        StringBuilder result = new StringBuilder();
+        int i = 0;
+        
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            
+            if (c == '{') {
+                int closeBracket = text.indexOf('}', i);
+                if (closeBracket != -1) {
+                    String placeholder = "%" + text.substring(i + 1, closeBracket) + "%";
+                    String parsed = PlaceholderAPI.setPlaceholders(player, placeholder);
+                    result.append(parsed);
+                    i = closeBracket + 1;
+                    continue;
+                }
+            }
+            
+            result.append(c);
+            i++;
+        }
+        
+        return result.toString();
     }
     
     private ItemStack getItemInSlot(Player player, String slot) {

@@ -1,4 +1,4 @@
-name: Build CheckSlot Expansion
+name: CheckSlot Expansion
 
 on:
   push:
@@ -10,6 +10,10 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
@@ -39,13 +43,13 @@ jobs:
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       uses: softprops/action-gh-release@v2
       with:
-        name: CheckSlot v1.0.0
-        tag_name: v1.0.0
+        name: CheckSlot v1.1.0
+        tag_name: v1.1.0
         files: target/Expansion-CheckSlot.jar
         body: |
           ## CheckSlot Expansion для PlaceholderAPI
           
-          ### Заполнители:
+          ### Без ника (текущий игрок):
           - `%checkslot_name_<slot>_<fallback>%`
           - `%checkslot_rawname_<slot>_<fallback>%`
           - `%checkslot_data_<slot>_<fallback>%`
@@ -59,6 +63,12 @@ jobs:
           - `%checkslot_rawattribute_<slot>_<fallback>%`
           - `%checkslot_durability_<slot>_<fallback>%`
           - `%checkslot_maxdurability_<slot>_<fallback>%`
+          
+          ### С ником:
+          - `%checkslot_<player>_name_<slot>_<fallback>%`
+          
+          ### С плейсхолдером:
+          - `%checkslot_{placeholder}_name_<slot>_<fallback>%`
           
           ### Слоты:
           `0-40`, `helmet`, `chestplate`, `leggings`, `boots`, `offhand`

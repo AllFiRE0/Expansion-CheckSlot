@@ -83,16 +83,30 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     private void loadTranslationFile(File file, String lang) {
         try {
+            Bukkit.getLogger().info("[CheckSlot] Читаю файл: " + file.getAbsolutePath());
+            Bukkit.getLogger().info("[CheckSlot] Размер файла: " + file.length() + " байт");
+        
             YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-            
+        
+            Bukkit.getLogger().info("[CheckSlot] Загружено ключей: " + config.getKeys(false).size());
+        
+            // Выводим первые 10 ключей для проверки
+            int count = 0;
+            for (String key : config.getKeys(false)) {
+                if (count < 10) {
+                    Bukkit.getLogger().info("[CheckSlot]   " + key + " = " + config.getString(key));
+                    count++;
+                }
+            }
+        
             Map<String, String> itemMap = new HashMap<>();
             Map<String, String> enchantMap = new HashMap<>();
             Map<String, String> potionMap = new HashMap<>();
-            
+        
             for (String key : config.getKeys(false)) {
                 String value = config.getString(key);
                 if (value == null) continue;
-                
+            
                 if (key.startsWith("enchant_")) {
                     enchantMap.put(key.substring(8), value);
                 } else if (key.startsWith("potion_")) {
@@ -101,12 +115,15 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                     itemMap.put(key, value);
                 }
             }
-            
+        
             translations.put(lang, itemMap);
             enchantTranslations.put(lang, enchantMap);
             potionTranslations.put(lang, potionMap);
-            
+        
+            Bukkit.getLogger().info("[CheckSlot] Загружено предметов для " + lang + ": " + itemMap.size());
+        
         } catch (Exception e) {
+            Bukkit.getLogger().severe("[CheckSlot] Ошибка загрузки " + lang + ".yml: " + e.getMessage());
             e.printStackTrace();
         }
     }

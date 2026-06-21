@@ -121,13 +121,11 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         String slotAndFallback;
         
         if (typeSlotFallback.startsWith("lore-")) {
-            // lore-1_slot_fallback
             int firstUnderscore = typeSlotFallback.indexOf('_');
             if (firstUnderscore == -1) return "";
             type = typeSlotFallback.substring(0, firstUnderscore);
             slotAndFallback = typeSlotFallback.substring(firstUnderscore + 1);
         } else if (typeSlotFallback.startsWith("lore_")) {
-            // lore_slot_fallback или lore_1,2,3_slot_fallback
             String afterLore = typeSlotFallback.substring(5);
             
             if (afterLore.matches("^[\\d,\\-|\\n\\\\]+_.*")) {
@@ -173,7 +171,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         
         try {
-            // lore-1, lore-2, ... lore-100
             if (type.startsWith("lore-")) {
                 return getLoreLine(item, type, fallback);
             }
@@ -310,8 +307,13 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return meta.getDisplayName();
         }
         try {
-            return item.getI18NDisplayName();
-        } catch (NoSuchMethodError e) {
+            Object i18nName = item.getClass().getMethod("getI18NDisplayName").invoke(item);
+            if (i18nName instanceof String s) {
+                return s;
+            }
+            Component component = (Component) i18nName;
+            return LegacyComponentSerializer.legacySection().serialize(component);
+        } catch (Exception e) {
             return formatMaterialName(item.getType());
         }
     }
@@ -322,8 +324,16 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return stripColor(meta.getDisplayName());
         }
         try {
-            return stripColor(item.getI18NDisplayName());
-        } catch (NoSuchMethodError e) {
+            Object i18nName = item.getClass().getMethod("getI18NDisplayName").invoke(item);
+            String name;
+            if (i18nName instanceof String s) {
+                name = s;
+            } else {
+                Component component = (Component) i18nName;
+                name = LegacyComponentSerializer.legacySection().serialize(component);
+            }
+            return stripColor(name);
+        } catch (Exception e) {
             return formatMaterialName(item.getType()).toLowerCase();
         }
     }
@@ -352,7 +362,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return !data.isEmpty() ? data.toString() : fallback;
     }
     
-    // Весь лор одной строкой с \n
     private String getItemLore(ItemStack item, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasLore()) {
@@ -362,7 +371,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    // Отдельная строка: lore-1, lore-2, ... lore-100
     private String getLoreLine(ItemStack item, String type, String fallback) {
         try {
             int lineNum = Integer.parseInt(type.substring(5)) - 1;
@@ -378,7 +386,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    // Кастомный лор: lore_1,2,3_slot_fallback
     private String getCustomLore(ItemStack item, String loreParams, String fallback) {
         if (loreParams == null || loreParams.isEmpty()) return fallback;
         
@@ -516,18 +523,26 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     private String getI18nEnchantmentName(Enchantment enchant) {
         try {
-            Component displayName = enchant.displayName(1);
-            return LegacyComponentSerializer.legacySection().serialize(displayName);
-        } catch (NoSuchMethodError e) {
+            Object displayName = enchant.getClass().getMethod("displayName", int.class).invoke(enchant, 1);
+            if (displayName instanceof String s) {
+                return s;
+            }
+            Component component = (Component) displayName;
+            return LegacyComponentSerializer.legacySection().serialize(component);
+        } catch (Exception e) {
             return formatEnchantmentName(enchant);
         }
     }
     
     private String getI18nPotionEffectName(PotionEffectType type) {
         try {
-            Component displayName = type.displayName();
-            return LegacyComponentSerializer.legacySection().serialize(displayName);
-        } catch (NoSuchMethodError e) {
+            Object displayName = type.getClass().getMethod("displayName").invoke(type);
+            if (displayName instanceof String s) {
+                return s;
+            }
+            Component component = (Component) displayName;
+            return LegacyComponentSerializer.legacySection().serialize(component);
+        } catch (Exception e) {
             return formatPotionEffectName(type);
         }
     }

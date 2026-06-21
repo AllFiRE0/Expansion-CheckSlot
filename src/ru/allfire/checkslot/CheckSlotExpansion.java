@@ -39,7 +39,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     @Override
     public String getVersion() {
-        return "1.6.0";
+        return "1.6.1";
     }
     
     @Override
@@ -306,13 +306,17 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
+        // Пробуем Paper метод через рефлексию
         try {
-            Object i18nName = item.getClass().getMethod("getI18NDisplayName").invoke(item);
-            if (i18nName instanceof String s) {
+            java.lang.reflect.Method method = item.getClass().getMethod("getI18NDisplayName");
+            Object result = method.invoke(item);
+            if (result instanceof String s) {
                 return s;
             }
-            Component component = (Component) i18nName;
-            return LegacyComponentSerializer.legacySection().serialize(component);
+            if (result instanceof Component component) {
+                return LegacyComponentSerializer.legacySection().serialize(component);
+            }
+            return result.toString();
         } catch (Exception e) {
             return formatMaterialName(item.getType());
         }
@@ -324,13 +328,15 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return stripColor(meta.getDisplayName());
         }
         try {
-            Object i18nName = item.getClass().getMethod("getI18NDisplayName").invoke(item);
+            java.lang.reflect.Method method = item.getClass().getMethod("getI18NDisplayName");
+            Object result = method.invoke(item);
             String name;
-            if (i18nName instanceof String s) {
+            if (result instanceof String s) {
                 name = s;
-            } else {
-                Component component = (Component) i18nName;
+            } else if (result instanceof Component component) {
                 name = LegacyComponentSerializer.legacySection().serialize(component);
+            } else {
+                name = result.toString();
             }
             return stripColor(name);
         } catch (Exception e) {
@@ -523,12 +529,13 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     private String getI18nEnchantmentName(Enchantment enchant) {
         try {
-            Object displayName = enchant.getClass().getMethod("displayName", int.class).invoke(enchant, 1);
-            if (displayName instanceof String s) {
-                return s;
+            java.lang.reflect.Method method = enchant.getClass().getMethod("displayName", int.class);
+            Object result = method.invoke(enchant, 1);
+            if (result instanceof String s) return s;
+            if (result instanceof Component component) {
+                return LegacyComponentSerializer.legacySection().serialize(component);
             }
-            Component component = (Component) displayName;
-            return LegacyComponentSerializer.legacySection().serialize(component);
+            return result.toString();
         } catch (Exception e) {
             return formatEnchantmentName(enchant);
         }
@@ -536,12 +543,13 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     private String getI18nPotionEffectName(PotionEffectType type) {
         try {
-            Object displayName = type.getClass().getMethod("displayName").invoke(type);
-            if (displayName instanceof String s) {
-                return s;
+            java.lang.reflect.Method method = type.getClass().getMethod("displayName");
+            Object result = method.invoke(type);
+            if (result instanceof String s) return s;
+            if (result instanceof Component component) {
+                return LegacyComponentSerializer.legacySection().serialize(component);
             }
-            Component component = (Component) displayName;
-            return LegacyComponentSerializer.legacySection().serialize(component);
+            return result.toString();
         } catch (Exception e) {
             return formatPotionEffectName(type);
         }

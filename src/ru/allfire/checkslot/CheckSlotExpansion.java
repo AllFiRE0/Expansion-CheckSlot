@@ -1,3 +1,4 @@
+// CheckSlotExpansion.java
 package ru.allfire.checkslot;
 
 import java.util.ArrayList;
@@ -427,20 +428,21 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nEnchantName(Enchantment enchant, Player player) {
-        // Paper 1.21.11: displayName() доступен
+        // Прямой перевод через GlobalTranslator
         try {
-            Component displayName = enchant.displayName(1);
-            return LegacyComponentSerializer.legacySection().serialize(displayName);
-        } catch (Exception e) {
-            // Fallback через GlobalTranslator
-            try {
-                Component translatable = Component.translatable(enchant.getTranslationKey());
-                Component rendered = GlobalTranslator.render(translatable, player.locale());
-                return LegacyComponentSerializer.legacySection().serialize(rendered);
-            } catch (Exception ex) {
+            String translationKey = enchant.getTranslationKey();
+            if (translationKey == null || translationKey.isEmpty()) {
                 return formatEnchantmentName(enchant);
             }
-        }
+            Component translatable = Component.translatable(translationKey);
+            Component rendered = GlobalTranslator.render(translatable, player.locale());
+            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
+            if (!result.equals(translationKey)) {
+                return result;
+            }
+        } catch (Exception ignored) {}
+        
+        return formatEnchantmentName(enchant);
     }
     
     // === POTION ===
@@ -470,20 +472,21 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nPotionName(PotionEffectType type, Player player) {
-        // Paper 1.21.11: displayName() доступен
+        // Прямой перевод через GlobalTranslator
         try {
-            Component displayName = type.displayName();
-            return LegacyComponentSerializer.legacySection().serialize(displayName);
-        } catch (Exception e) {
-            // Fallback через GlobalTranslator
-            try {
-                Component translatable = Component.translatable(type.getTranslationKey());
-                Component rendered = GlobalTranslator.render(translatable, player.locale());
-                return LegacyComponentSerializer.legacySection().serialize(rendered);
-            } catch (Exception ex) {
+            String translationKey = type.getTranslationKey();
+            if (translationKey == null || translationKey.isEmpty()) {
                 return formatPotionEffectName(type);
             }
-        }
+            Component translatable = Component.translatable(translationKey);
+            Component rendered = GlobalTranslator.render(translatable, player.locale());
+            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
+            if (!result.equals(translationKey)) {
+                return result;
+            }
+        } catch (Exception ignored) {}
+        
+        return formatPotionEffectName(type);
     }
     
     // === ATTRIBUTES ===

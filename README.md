@@ -1,4 +1,3 @@
-```markdown
 # Expansion-CheckSlot
 
 Expansion for PlaceholderAPI that provides placeholders for checking player inventory slots.

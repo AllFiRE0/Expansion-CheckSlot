@@ -277,7 +277,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
-        // Paper API: getI18NDisplayName() возвращает переведённое название
+        // Paper API: getI18NDisplayName() доступен напрямую у ItemStack в 1.21.1
         try {
             String i18nName = item.getI18NDisplayName();
             if (i18nName != null && !i18nName.isEmpty()) {
@@ -421,7 +421,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nEnchantName(Enchantment enchant, Player player) {
-        // Paper API: displayName()
+        // Paper 1.21.1 API: displayName()
         try {
             Component displayName = enchant.displayName(1);
             return LegacyComponentSerializer.legacySection().serialize(displayName);
@@ -457,7 +457,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nPotionName(PotionEffectType type, Player player) {
-        // Paper API: displayName()
+        // Paper 1.21.1 API: displayName()
         try {
             Component displayName = type.displayName();
             return LegacyComponentSerializer.legacySection().serialize(displayName);
@@ -481,7 +481,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                     if (raw) {
                         attrList.add(attrName + ":" + amount + ":" + operation);
                     } else {
-                        attrList.add(attrName + " " + (amount > 0 ? "+" : "") + String.format("%.1f", amount) + " " + operation);
+                        String sign = amount > 0 ? "+" : "";
+                        attrList.add(attrName + " " + sign + String.format("%.1f", amount) + " " + operation);
                     }
                 });
                 return raw ? String.join(",", attrList) : String.join(", ", attrList);

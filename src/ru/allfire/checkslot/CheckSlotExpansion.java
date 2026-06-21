@@ -277,17 +277,23 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
-        // Paper API: getI18NDisplayName() доступен напрямую у ItemStack в 1.21.1
+        
+        // Paper 1.21.11: getI18NDisplayName() доступен
         try {
             String i18nName = item.getI18NDisplayName();
             if (i18nName != null && !i18nName.isEmpty()) {
                 return i18nName;
             }
-        } catch (Exception e) {
-            // Fallback: GlobalTranslator
-            return translateKey(item.getType().getTranslationKey(), player.locale(), 
-                formatMaterialName(item.getType()));
-        }
+        } catch (Exception ignored) {}
+        
+        // Fallback через Component API
+        try {
+            String translationKey = item.getType().getItemTranslationKey();
+            Component translatable = Component.translatable(translationKey);
+            Component rendered = GlobalTranslator.render(translatable, player.locale());
+            return LegacyComponentSerializer.legacySection().serialize(rendered);
+        } catch (Exception ignored) {}
+        
         return formatMaterialName(item.getType());
     }
     
@@ -421,12 +427,19 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nEnchantName(Enchantment enchant, Player player) {
-        // Paper 1.21.1 API: displayName()
+        // Paper 1.21.11: displayName() доступен
         try {
             Component displayName = enchant.displayName(1);
             return LegacyComponentSerializer.legacySection().serialize(displayName);
         } catch (Exception e) {
-            return translateKey(enchant.getTranslationKey(), player.locale(), formatEnchantmentName(enchant));
+            // Fallback через GlobalTranslator
+            try {
+                Component translatable = Component.translatable(enchant.getTranslationKey());
+                Component rendered = GlobalTranslator.render(translatable, player.locale());
+                return LegacyComponentSerializer.legacySection().serialize(rendered);
+            } catch (Exception ex) {
+                return formatEnchantmentName(enchant);
+            }
         }
     }
     
@@ -457,12 +470,19 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getI18nPotionName(PotionEffectType type, Player player) {
-        // Paper 1.21.1 API: displayName()
+        // Paper 1.21.11: displayName() доступен
         try {
             Component displayName = type.displayName();
             return LegacyComponentSerializer.legacySection().serialize(displayName);
         } catch (Exception e) {
-            return translateKey(type.getTranslationKey(), player.locale(), formatPotionEffectName(type));
+            // Fallback через GlobalTranslator
+            try {
+                Component translatable = Component.translatable(type.getTranslationKey());
+                Component rendered = GlobalTranslator.render(translatable, player.locale());
+                return LegacyComponentSerializer.legacySection().serialize(rendered);
+            } catch (Exception ex) {
+                return formatPotionEffectName(type);
+            }
         }
     }
     

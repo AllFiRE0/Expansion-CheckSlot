@@ -1,4 +1,3 @@
-// CheckSlotExpansion.java
 package ru.allfire.checkslot;
 
 import java.util.ArrayList;
@@ -279,20 +278,17 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return meta.getDisplayName();
         }
         
-        // Paper 1.21.11: getI18NDisplayName() доступен
-        try {
-            String i18nName = item.getI18NDisplayName();
-            if (i18nName != null && !i18nName.isEmpty()) {
-                return i18nName;
-            }
-        } catch (Exception ignored) {}
-        
-        // Fallback через Component API
+        // Используем Component API и GlobalTranslator для перевода
         try {
             String translationKey = item.getType().getItemTranslationKey();
-            Component translatable = Component.translatable(translationKey);
-            Component rendered = GlobalTranslator.render(translatable, player.locale());
-            return LegacyComponentSerializer.legacySection().serialize(rendered);
+            if (translationKey != null && !translationKey.isEmpty()) {
+                Component translatable = Component.translatable(translationKey);
+                Component rendered = GlobalTranslator.render(translatable, player.locale());
+                String result = LegacyComponentSerializer.legacySection().serialize(rendered);
+                if (result != null && !result.equals(translationKey)) {
+                    return result;
+                }
+            }
         } catch (Exception ignored) {}
         
         return formatMaterialName(item.getType());

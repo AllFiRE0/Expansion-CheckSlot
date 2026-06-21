@@ -2,6 +2,7 @@ package ru.allfire.checkslot;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -24,6 +25,7 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.translation.GlobalTranslator;
 
 public class CheckSlotExpansion extends PlaceholderExpansion {
     
@@ -39,7 +41,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     @Override
     public String getVersion() {
-        return "1.6.1";
+        return "1.6.3";
     }
     
     @Override
@@ -84,7 +86,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         Player viewer = p.getPlayer();
         if (viewer == null) return "";
         
-        // Определяем, есть ли ник игрока в начале
         String firstPart = params.contains("_") ? params.substring(0, params.indexOf('_')) : params;
         boolean hasPlayerArg = false;
         String playerArg = null;
@@ -115,7 +116,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             typeSlotFallback = params;
         }
         
-        // Определяем тип
         String type;
         String loreParams = null;
         String slotAndFallback;
@@ -144,14 +144,12 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             slotAndFallback = typeSlotFallback.substring(firstUnderscore + 1);
         }
         
-        // Парсим slot_fallback
         String[] parts = slotAndFallback.split("_", 2);
         if (parts.length < 1) return "";
         
         String slotStr = parts[0];
         String fallback = parts.length > 1 ? parts[1].replace('&', '§') : "";
         
-        // Определяем целевого игрока
         Player target;
         if (hasPlayerArg) {
             target = resolvePlayer(viewer, playerArg);
@@ -181,9 +179,9 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                 case "rawname":
                     return getRawItemName(item, fallback);
                 case "displayname":
-                    return getDisplayName(item, fallback);
+                    return getDisplayName(item, target, fallback);
                 case "rawdisplayname":
-                    return getRawDisplayName(item, fallback);
+                    return getRawDisplayName(item, target, fallback);
                 case "data":
                     return getItemData(item, fallback);
                 case "lore":
@@ -195,17 +193,17 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                 case "rawenchants":
                     return getEnchantments(item, true, false, fallback);
                 case "displayenchants":
-                    return getEnchantments(item, false, true, fallback);
+                    return getEnchantments(item, false, true, target, fallback);
                 case "rawdisplayenchants":
-                    return getEnchantments(item, true, true, fallback);
+                    return getEnchantments(item, true, true, target, fallback);
                 case "potion":
                     return getPotionEffects(item, false, false, fallback);
                 case "rawpotion":
                     return getPotionEffects(item, true, false, fallback);
                 case "displaypotion":
-                    return getPotionEffects(item, false, true, fallback);
+                    return getPotionEffects(item, false, true, target, fallback);
                 case "rawdisplaypotion":
-                    return getPotionEffects(item, true, true, fallback);
+                    return getPotionEffects(item, true, true, target, fallback);
                 case "attribute":
                     return getAttributes(item, false, fallback);
                 case "rawattribute":
@@ -241,7 +239,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             if (parsed == null || parsed.isEmpty()) return null;
             return Bukkit.getPlayer(parsed);
         }
-        
         return Bukkit.getPlayer(playerArg);
     }
     
@@ -293,6 +290,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         };
     }
     
+    // === NAME ===
+    
     private String getItemName(ItemStack item, String fallback) {
         return formatMaterialName(item.getType());
     }
@@ -301,48 +300,23 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return item.getType().name().toLowerCase();
     }
     
-    private String getDisplayName(ItemStack item, String fallback) {
+    private String getDisplayName(ItemStack item, Player player, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
-        // Пробуем Paper метод через рефлексию
-        try {
-            java.lang.reflect.Method method = item.getClass().getMethod("getI18NDisplayName");
-            Object result = method.invoke(item);
-            if (result instanceof String s) {
-                return s;
-            }
-            if (result instanceof Component component) {
-                return LegacyComponentSerializer.legacySection().serialize(component);
-            }
-            return result.toString();
-        } catch (Exception e) {
-            return formatMaterialName(item.getType());
-        }
+        return translateKey(item.getType().getTranslationKey(), player.locale(), fallback);
     }
     
-    private String getRawDisplayName(ItemStack item, String fallback) {
+    private String getRawDisplayName(ItemStack item, Player player, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasDisplayName()) {
             return stripColor(meta.getDisplayName());
         }
-        try {
-            java.lang.reflect.Method method = item.getClass().getMethod("getI18NDisplayName");
-            Object result = method.invoke(item);
-            String name;
-            if (result instanceof String s) {
-                name = s;
-            } else if (result instanceof Component component) {
-                name = LegacyComponentSerializer.legacySection().serialize(component);
-            } else {
-                name = result.toString();
-            }
-            return stripColor(name);
-        } catch (Exception e) {
-            return formatMaterialName(item.getType()).toLowerCase();
-        }
+        return stripColor(translateKey(item.getType().getTranslationKey(), player.locale(), fallback));
     }
+    
+    // === DATA ===
     
     private String getItemData(ItemStack item, String fallback) {
         StringBuilder data = new StringBuilder();
@@ -367,6 +341,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         
         return !data.isEmpty() ? data.toString() : fallback;
     }
+    
+    // === LORE ===
     
     private String getItemLore(ItemStack item, String fallback) {
         ItemMeta meta = item.getItemMeta();
@@ -473,7 +449,13 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return numbers;
     }
     
+    // === ENCHANTMENTS ===
+    
     private String getEnchantments(ItemStack item, boolean raw, boolean i18n, String fallback) {
+        return getEnchantments(item, raw, i18n, null, fallback);
+    }
+    
+    private String getEnchantments(ItemStack item, boolean raw, boolean i18n, Player player, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasEnchants()) {
             Map<Enchantment, Integer> enchants = meta.getEnchants();
@@ -484,8 +466,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             List<String> enchantList = new ArrayList<>();
             enchants.forEach((enchant, level) -> {
                 String enchantName;
-                if (i18n) {
-                    enchantName = getI18nEnchantmentName(enchant);
+                if (i18n && player != null) {
+                    enchantName = translateKey(enchant.getTranslationKey(), player.locale(), formatEnchantmentName(enchant));
                     if (raw) enchantName = stripColor(enchantName);
                 } else {
                     enchantName = raw ? enchant.getKey().getKey().toLowerCase() : 
@@ -500,7 +482,13 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
+    // === POTION ===
+    
     private String getPotionEffects(ItemStack item, boolean raw, boolean i18n, String fallback) {
+        return getPotionEffects(item, raw, i18n, null, fallback);
+    }
+    
+    private String getPotionEffects(ItemStack item, boolean raw, boolean i18n, Player player, String fallback) {
         if (item.getItemMeta() instanceof PotionMeta potionMeta) {
             List<PotionEffect> effects = potionMeta.getCustomEffects();
             if (effects.isEmpty()) {
@@ -510,8 +498,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             List<String> effectList = new ArrayList<>();
             for (PotionEffect effect : effects) {
                 String effectName;
-                if (i18n) {
-                    effectName = getI18nPotionEffectName(effect.getType());
+                if (i18n && player != null) {
+                    effectName = translateKey(effect.getType().getTranslationKey(), player.locale(), formatPotionEffectName(effect.getType()));
                     if (raw) effectName = stripColor(effectName);
                 } else {
                     effectName = raw ? effect.getType().getKey().getKey().toLowerCase() :
@@ -527,33 +515,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    private String getI18nEnchantmentName(Enchantment enchant) {
-        try {
-            java.lang.reflect.Method method = enchant.getClass().getMethod("displayName", int.class);
-            Object result = method.invoke(enchant, 1);
-            if (result instanceof String s) return s;
-            if (result instanceof Component component) {
-                return LegacyComponentSerializer.legacySection().serialize(component);
-            }
-            return result.toString();
-        } catch (Exception e) {
-            return formatEnchantmentName(enchant);
-        }
-    }
-    
-    private String getI18nPotionEffectName(PotionEffectType type) {
-        try {
-            java.lang.reflect.Method method = type.getClass().getMethod("displayName");
-            Object result = method.invoke(type);
-            if (result instanceof String s) return s;
-            if (result instanceof Component component) {
-                return LegacyComponentSerializer.legacySection().serialize(component);
-            }
-            return result.toString();
-        } catch (Exception e) {
-            return formatPotionEffectName(type);
-        }
-    }
+    // === ATTRIBUTES ===
     
     private String getAttributes(ItemStack item, boolean raw, String fallback) {
         ItemMeta meta = item.getItemMeta();
@@ -582,6 +544,8 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
+    // === DURABILITY ===
+    
     private String getDurability(ItemStack item, boolean max, String fallback) {
         if (item.getType().getMaxDurability() > 0) {
             if (max) {
@@ -592,6 +556,25 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         return fallback;
     }
+    
+    // === TRANSLATE ===
+    
+    private String translateKey(String translationKey, Locale locale, String fallback) {
+        try {
+            Component translatable = Component.translatable(translationKey);
+            Component rendered = GlobalTranslator.render(translatable, locale);
+            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
+            // Если перевод совпадает с ключом — значит перевода нет
+            if (result.equals(translationKey)) {
+                return fallback;
+            }
+            return result;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+    
+    // === FORMATTING ===
     
     private String formatMaterialName(Material material) {
         String name = material.name().toLowerCase().replace('_', ' ');

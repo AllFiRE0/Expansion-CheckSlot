@@ -23,7 +23,7 @@ Expansion for PlaceholderAPI that provides placeholders for checking player inve
 ```text
 %checkslot_<type><slot><fallback>%
 %checkslot_<player><type><slot><fallback>%
-%checkslot{placeholder}<type><slot>_<fallback>%
+%checkslot_{placeholder}_<type>_<slot>_<fallback>%
 ```
 
 Slots / Слоты

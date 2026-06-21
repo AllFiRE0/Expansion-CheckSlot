@@ -1,6 +1,10 @@
 package ru.allfire.checkslot;
 
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,14 +24,141 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.translation.GlobalTranslator;
 
 public class CheckSlotExpansion extends PlaceholderExpansion {
+    
+    private Plugin plugin;
+    private Map<String, Map<String, String>> translations = new HashMap<>();
+    private Map<String, Map<String, String>> enchantTranslations = new HashMap<>();
+    private Map<String, Map<String, String>> potionTranslations = new HashMap<>();
+    
+    private final List<String> AVAILABLE_LANGUAGES = List.of("ru", "en", "cn");
+    
+    @Override
+    public boolean register() {
+        plugin = Bukkit.getPluginManager().getPlugin("PlaceholderAPI");
+        if (plugin == null) return false;
+        
+        loadAllTranslations();
+        return super.register();
+    }
+    
+    private void loadAllTranslations() {
+        File translationsDir = new File(plugin.getDataFolder(), "translations");
+        if (!translationsDir.exists()) {
+            translationsDir.mkdirs();
+        }
+        
+        for (String lang : AVAILABLE_LANGUAGES) {
+            File langFile = new File(translationsDir, lang + ".yml");
+            
+            if (!langFile.exists()) {
+                try (InputStream in = getClass().getResourceAsStream("/translations/" + lang + ".yml")) {
+                    if (in != null) {
+                        Files.copy(in, langFile.toPath());
+                    } else {
+                        createDefaultTranslationFile(langFile, lang);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            
+            loadTranslationFile(langFile, lang);
+        }
+        
+        Bukkit.getLogger().info("[CheckSlot] Загружено переводов:");
+        for (String lang : AVAILABLE_LANGUAGES) {
+            int count = translations.getOrDefault(lang, new HashMap<>()).size();
+            Bukkit.getLogger().info("[CheckSlot]   " + lang + ".yml: " + count + " предметов");
+        }
+    }
+    
+    private void loadTranslationFile(File file, String lang) {
+        try {
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+            
+            Map<String, String> itemMap = new HashMap<>();
+            Map<String, String> enchantMap = new HashMap<>();
+            Map<String, String> potionMap = new HashMap<>();
+            
+            for (String key : config.getKeys(false)) {
+                String value = config.getString(key);
+                if (value == null) continue;
+                
+                if (key.startsWith("enchant_")) {
+                    enchantMap.put(key.substring(8), value);
+                } else if (key.startsWith("potion_")) {
+                    potionMap.put(key.substring(7), value);
+                } else {
+                    itemMap.put(key, value);
+                }
+            }
+            
+            translations.put(lang, itemMap);
+            enchantTranslations.put(lang, enchantMap);
+            potionTranslations.put(lang, potionMap);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void createDefaultTranslationFile(File file, String lang) {
+        YamlConfiguration config = new YamlConfiguration();
+        
+        switch (lang) {
+            case "ru":
+                config.set("CALCITE", "Кальцит");
+                config.set("DIAMOND", "Алмаз");
+                config.set("STONE", "Камень");
+                config.set("GRASS_BLOCK", "Блок травы");
+                config.set("OAK_LOG", "Бревно дуба");
+                config.set("enchant_SHARPNESS", "Острота");
+                config.set("potion_SPEED", "Скорость");
+                break;
+            case "en":
+                config.set("CALCITE", "Calcite");
+                config.set("DIAMOND", "Diamond");
+                config.set("STONE", "Stone");
+                config.set("GRASS_BLOCK", "Grass Block");
+                config.set("OAK_LOG", "Oak Log");
+                config.set("enchant_SHARPNESS", "Sharpness");
+                config.set("potion_SPEED", "Speed");
+                break;
+            case "cn":
+                config.set("CALCITE", "方解石");
+                config.set("DIAMOND", "钻石");
+                config.set("STONE", "石头");
+                config.set("GRASS_BLOCK", "草方块");
+                config.set("OAK_LOG", "橡木原木");
+                config.set("enchant_SHARPNESS", "锋利");
+                config.set("potion_SPEED", "速度");
+                break;
+        }
+        
+        try {
+            config.save(file);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private String getLanguageCode(Player player) {
+        Locale locale = player.locale();
+        String lang = locale.getLanguage();
+        
+        if (lang.startsWith("ru")) return "ru";
+        if (lang.startsWith("zh")) return "cn";
+        return "en";
+    }
     
     @Override
     public String getAuthor() {
@@ -260,8 +391,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         };
     }
     
-    // === NAME (английские для проверок) ===
-    
     private String getItemName(ItemStack item, String fallback) {
         return formatMaterialName(item.getType());
     }
@@ -270,26 +399,22 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return item.getType().name().toLowerCase();
     }
     
-    // === DISPLAYNAME (клиентский перевод, Paper API) ===
-    
     private String getDisplayName(ItemStack item, Player player, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
         
-        // Используем Component API и GlobalTranslator для перевода
-        try {
-            String translationKey = item.getType().getItemTranslationKey();
-            if (translationKey != null && !translationKey.isEmpty()) {
-                Component translatable = Component.translatable(translationKey);
-                Component rendered = GlobalTranslator.render(translatable, player.locale());
-                String result = LegacyComponentSerializer.legacySection().serialize(rendered);
-                if (result != null && !result.equals(translationKey)) {
-                    return result;
-                }
+        String lang = getLanguageCode(player);
+        String materialName = item.getType().name();
+        
+        Map<String, String> langMap = translations.get(lang);
+        if (langMap != null) {
+            String translated = langMap.get(materialName);
+            if (translated != null && !translated.isEmpty()) {
+                return translated;
             }
-        } catch (Exception ignored) {}
+        }
         
         return formatMaterialName(item.getType());
     }
@@ -301,8 +426,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         return stripColor(getDisplayName(item, player, fallback));
     }
-    
-    // === DATA ===
     
     private String getItemData(ItemStack item, String fallback) {
         StringBuilder data = new StringBuilder();
@@ -316,8 +439,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         return !data.isEmpty() ? data.toString() : fallback;
     }
-    
-    // === LORE ===
     
     private String getItemLore(ItemStack item, String fallback) {
         ItemMeta meta = item.getItemMeta();
@@ -397,19 +518,22 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return numbers;
     }
     
-    // === ENCHANTMENTS ===
-    
     private String getEnchantments(ItemStack item, boolean raw, boolean i18n, Player player, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasEnchants()) {
             Map<Enchantment, Integer> enchants = meta.getEnchants();
             if (enchants.isEmpty()) return fallback;
             
+            String lang = i18n && player != null ? getLanguageCode(player) : null;
+            Map<String, String> langMap = lang != null ? enchantTranslations.get(lang) : null;
+            
             List<String> enchantList = new ArrayList<>();
             enchants.forEach((enchant, level) -> {
                 String enchantName;
-                if (i18n && player != null) {
-                    enchantName = getI18nEnchantName(enchant, player);
+                if (i18n && langMap != null) {
+                    String key = enchant.getKey().getKey().toUpperCase();
+                    String translated = langMap.get(key);
+                    enchantName = translated != null ? translated : formatEnchantmentName(enchant);
                     if (raw) enchantName = stripColor(enchantName);
                 } else {
                     enchantName = raw ? enchant.getKey().getKey().toLowerCase() : formatEnchantmentName(enchant);
@@ -423,36 +547,21 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    private String getI18nEnchantName(Enchantment enchant, Player player) {
-        // Прямой перевод через GlobalTranslator
-        try {
-            String translationKey = enchant.getTranslationKey();
-            if (translationKey == null || translationKey.isEmpty()) {
-                return formatEnchantmentName(enchant);
-            }
-            Component translatable = Component.translatable(translationKey);
-            Component rendered = GlobalTranslator.render(translatable, player.locale());
-            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
-            if (!result.equals(translationKey)) {
-                return result;
-            }
-        } catch (Exception ignored) {}
-        
-        return formatEnchantmentName(enchant);
-    }
-    
-    // === POTION ===
-    
     private String getPotionEffects(ItemStack item, boolean raw, boolean i18n, Player player, String fallback) {
         if (item.getItemMeta() instanceof PotionMeta potionMeta) {
             List<PotionEffect> effects = potionMeta.getCustomEffects();
             if (effects.isEmpty()) return fallback;
             
+            String lang = i18n && player != null ? getLanguageCode(player) : null;
+            Map<String, String> langMap = lang != null ? potionTranslations.get(lang) : null;
+            
             List<String> effectList = new ArrayList<>();
             for (PotionEffect effect : effects) {
                 String effectName;
-                if (i18n && player != null) {
-                    effectName = getI18nPotionName(effect.getType(), player);
+                if (i18n && langMap != null) {
+                    String key = effect.getType().getKey().getKey().toUpperCase();
+                    String translated = langMap.get(key);
+                    effectName = translated != null ? translated : formatPotionEffectName(effect.getType());
                     if (raw) effectName = stripColor(effectName);
                 } else {
                     effectName = raw ? effect.getType().getKey().getKey().toLowerCase() : formatPotionEffectName(effect.getType());
@@ -466,26 +575,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         return fallback;
     }
-    
-    private String getI18nPotionName(PotionEffectType type, Player player) {
-        // Прямой перевод через GlobalTranslator
-        try {
-            String translationKey = type.getTranslationKey();
-            if (translationKey == null || translationKey.isEmpty()) {
-                return formatPotionEffectName(type);
-            }
-            Component translatable = Component.translatable(translationKey);
-            Component rendered = GlobalTranslator.render(translatable, player.locale());
-            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
-            if (!result.equals(translationKey)) {
-                return result;
-            }
-        } catch (Exception ignored) {}
-        
-        return formatPotionEffectName(type);
-    }
-    
-    // === ATTRIBUTES ===
     
     private String getAttributes(ItemStack item, boolean raw, String fallback) {
         ItemMeta meta = item.getItemMeta();
@@ -510,8 +599,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    // === DURABILITY ===
-    
     private String getDurability(ItemStack item, boolean max, String fallback) {
         if (item.getType().getMaxDurability() > 0) {
             if (max) return String.valueOf(item.getType().getMaxDurability());
@@ -519,20 +606,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         return fallback;
     }
-    
-    // === TRANSLATE (GlobalTranslator fallback) ===
-    
-    private String translateKey(String translationKey, Locale locale, String fallback) {
-        try {
-            Component translatable = Component.translatable(translationKey);
-            Component rendered = GlobalTranslator.render(translatable, locale);
-            String result = LegacyComponentSerializer.legacySection().serialize(rendered);
-            if (!result.equals(translationKey)) return result;
-        } catch (Exception ignored) {}
-        return fallback;
-    }
-    
-    // === FORMATTING ===
     
     private String formatMaterialName(Material material) {
         String name = material.name().toLowerCase().replace('_', ' ');

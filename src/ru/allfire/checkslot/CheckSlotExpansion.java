@@ -3,6 +3,7 @@ package ru.allfire.checkslot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.google.common.collect.Multimap;
 
@@ -21,6 +22,8 @@ import org.bukkit.potion.PotionEffectType;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public class CheckSlotExpansion extends PlaceholderExpansion {
     
@@ -36,57 +39,38 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     
     @Override
     public String getVersion() {
-        return "1.1.0";
+        return "1.6.0";
     }
     
     @Override
     public List<String> getPlaceholders() {
         List<String> placeholders = new ArrayList<>();
         
-        // Без ника (текущий игрок)
+        // Без ника
         placeholders.add("%checkslot_name_<slot>_<fallback>%");
         placeholders.add("%checkslot_rawname_<slot>_<fallback>%");
+        placeholders.add("%checkslot_displayname_<slot>_<fallback>%");
+        placeholders.add("%checkslot_rawdisplayname_<slot>_<fallback>%");
         placeholders.add("%checkslot_data_<slot>_<fallback>%");
         placeholders.add("%checkslot_lore_<slot>_<fallback>%");
+        placeholders.add("%checkslot_lore_1,2-3\n4_<slot>_<fallback>%");
         placeholders.add("%checkslot_lore-1_<slot>_<fallback>%");
+        placeholders.add("%checkslot_lore-2_<slot>_<fallback>%");
         placeholders.add("%checkslot_enchants_<slot>_<fallback>%");
         placeholders.add("%checkslot_rawenchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_displayenchants_<slot>_<fallback>%");
+        placeholders.add("%checkslot_rawdisplayenchants_<slot>_<fallback>%");
         placeholders.add("%checkslot_potion_<slot>_<fallback>%");
         placeholders.add("%checkslot_rawpotion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_displaypotion_<slot>_<fallback>%");
+        placeholders.add("%checkslot_rawdisplaypotion_<slot>_<fallback>%");
         placeholders.add("%checkslot_attribute_<slot>_<fallback>%");
         placeholders.add("%checkslot_rawattribute_<slot>_<fallback>%");
         placeholders.add("%checkslot_durability_<slot>_<fallback>%");
         placeholders.add("%checkslot_maxdurability_<slot>_<fallback>%");
         
         // С ником
-        placeholders.add("%checkslot_<player>_name_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_rawname_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_data_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_lore_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_lore-1_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_enchants_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_rawenchants_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_potion_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_rawpotion_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_attribute_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_rawattribute_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_durability_<slot>_<fallback>%");
-        placeholders.add("%checkslot_<player>_maxdurability_<slot>_<fallback>%");
-        
-        // С плейсхолдером в {}
-        placeholders.add("%checkslot_{placeholder}_name_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_rawname_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_data_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_lore_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_lore-1_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_enchants_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_rawenchants_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_potion_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_rawpotion_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_attribute_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_rawattribute_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_durability_<slot>_<fallback>%");
-        placeholders.add("%checkslot_{placeholder}_maxdurability_<slot>_<fallback>%");
+        placeholders.add("%checkslot_<player>_<type>_<slot>_<fallback>%");
         
         return placeholders;
     }
@@ -106,17 +90,16 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         String playerArg = null;
         String typeSlotFallback;
         
-        // Известные типы
-        List<String> knownTypes = List.of("name", "rawname", "data", "lore", "enchants", 
-            "rawenchants", "potion", "rawpotion", "attribute", "rawattribute", 
-            "durability", "maxdurability");
+        List<String> knownTypes = List.of("name", "rawname", "displayname", "rawdisplayname",
+            "data", "lore", "enchants", "rawenchants", "displayenchants", "rawdisplayenchants",
+            "potion", "rawpotion", "displaypotion", "rawdisplaypotion",
+            "attribute", "rawattribute", "durability", "maxdurability");
         
-        boolean firstIsType = knownTypes.contains(firstPart) || firstPart.startsWith("lore-");
+        boolean firstIsType = knownTypes.contains(firstPart) || firstPart.startsWith("lore-") || firstPart.startsWith("lore");
         
         if (!firstIsType) {
             hasPlayerArg = true;
             if (firstPart.startsWith("{")) {
-                // Это плейсхолдер в {}
                 int closeBracket = findClosingBracket(params, 0);
                 if (closeBracket == -1) return "";
                 
@@ -124,23 +107,51 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                 playerArg = "%" + placeholderInBrackets + "%";
                 typeSlotFallback = params.substring(closeBracket + 2);
             } else {
-                // Это прямой ник
                 int firstUnderscore = params.indexOf('_');
                 playerArg = firstPart;
                 typeSlotFallback = params.substring(firstUnderscore + 1);
             }
         } else {
-            // Без ника — используем текущего игрока
             typeSlotFallback = params;
         }
         
-        // Парсим type_slot_fallback
-        String[] parts = typeSlotFallback.split("_", 3);
-        if (parts.length < 2) return "";
+        // Определяем тип
+        String type;
+        String loreParams = null;
+        String slotAndFallback;
         
-        String type = parts[0];
-        String slotStr = parts[1];
-        String fallback = parts.length > 2 ? parts[2].replace('&', '§') : "";
+        if (typeSlotFallback.startsWith("lore-")) {
+            // lore-1_slot_fallback
+            int firstUnderscore = typeSlotFallback.indexOf('_');
+            if (firstUnderscore == -1) return "";
+            type = typeSlotFallback.substring(0, firstUnderscore);
+            slotAndFallback = typeSlotFallback.substring(firstUnderscore + 1);
+        } else if (typeSlotFallback.startsWith("lore_")) {
+            // lore_slot_fallback или lore_1,2,3_slot_fallback
+            String afterLore = typeSlotFallback.substring(5);
+            
+            if (afterLore.matches("^[\\d,\\-|\\n\\\\]+_.*")) {
+                int secondUnderscore = afterLore.indexOf('_');
+                loreParams = afterLore.substring(0, secondUnderscore);
+                slotAndFallback = afterLore.substring(secondUnderscore + 1);
+                type = "lore_custom";
+            } else {
+                type = "lore";
+                slotAndFallback = afterLore;
+            }
+        } else {
+            int firstUnderscore = typeSlotFallback.indexOf('_');
+            if (firstUnderscore == -1) return "";
+            type = typeSlotFallback.substring(0, firstUnderscore);
+            slotAndFallback = typeSlotFallback.substring(firstUnderscore + 1);
+        }
+        
+        // Парсим slot_fallback
+        String[] parts = slotAndFallback.split("_", 2);
+        if (parts.length < 1) return "";
+        
+        String slotStr = parts[0];
+        String fallback = parts.length > 1 ? parts[1].replace('&', '§') : "";
         
         // Определяем целевого игрока
         Player target;
@@ -154,7 +165,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             return parseInlinePlaceholders(viewer, fallback);
         }
         
-        // Парсим fallback через PlaceholderAPI если есть {}
         fallback = parseInlinePlaceholders(target, fallback);
         
         ItemStack item = getItemInSlot(target, slotStr);
@@ -163,23 +173,42 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         }
         
         try {
-            switch (type.toLowerCase()) {
+            // lore-1, lore-2, ... lore-100
+            if (type.startsWith("lore-")) {
+                return getLoreLine(item, type, fallback);
+            }
+            
+            switch (type) {
                 case "name":
                     return getItemName(item, fallback);
                 case "rawname":
                     return getRawItemName(item, fallback);
+                case "displayname":
+                    return getDisplayName(item, fallback);
+                case "rawdisplayname":
+                    return getRawDisplayName(item, fallback);
                 case "data":
                     return getItemData(item, fallback);
                 case "lore":
                     return getItemLore(item, fallback);
+                case "lore_custom":
+                    return getCustomLore(item, loreParams, fallback);
                 case "enchants":
-                    return getEnchantments(item, false, fallback);
+                    return getEnchantments(item, false, false, fallback);
                 case "rawenchants":
-                    return getEnchantments(item, true, fallback);
+                    return getEnchantments(item, true, false, fallback);
+                case "displayenchants":
+                    return getEnchantments(item, false, true, fallback);
+                case "rawdisplayenchants":
+                    return getEnchantments(item, true, true, fallback);
                 case "potion":
-                    return getPotionEffects(item, false, fallback);
+                    return getPotionEffects(item, false, false, fallback);
                 case "rawpotion":
-                    return getPotionEffects(item, true, fallback);
+                    return getPotionEffects(item, true, false, fallback);
+                case "displaypotion":
+                    return getPotionEffects(item, false, true, fallback);
+                case "rawdisplaypotion":
+                    return getPotionEffects(item, true, true, fallback);
                 case "attribute":
                     return getAttributes(item, false, fallback);
                 case "rawattribute":
@@ -189,9 +218,6 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
                 case "maxdurability":
                     return getDurability(item, true, fallback);
                 default:
-                    if (type.startsWith("lore-")) {
-                        return getLoreLine(item, type, fallback);
-                    }
                     return fallback;
             }
         } catch (Exception e) {
@@ -271,19 +297,35 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
     }
     
     private String getItemName(ItemStack item, String fallback) {
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null && meta.hasDisplayName()) {
-            return meta.getDisplayName();
-        }
         return formatMaterialName(item.getType());
     }
     
     private String getRawItemName(ItemStack item, String fallback) {
+        return item.getType().name().toLowerCase();
+    }
+    
+    private String getDisplayName(ItemStack item, String fallback) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null && meta.hasDisplayName()) {
+            return meta.getDisplayName();
+        }
+        try {
+            return item.getI18NDisplayName();
+        } catch (NoSuchMethodError e) {
+            return formatMaterialName(item.getType());
+        }
+    }
+    
+    private String getRawDisplayName(ItemStack item, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasDisplayName()) {
             return stripColor(meta.getDisplayName());
         }
-        return formatMaterialName(item.getType()).toLowerCase();
+        try {
+            return stripColor(item.getI18NDisplayName());
+        } catch (NoSuchMethodError e) {
+            return formatMaterialName(item.getType()).toLowerCase();
+        }
     }
     
     private String getItemData(ItemStack item, String fallback) {
@@ -310,6 +352,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return !data.isEmpty() ? data.toString() : fallback;
     }
     
+    // Весь лор одной строкой с \n
     private String getItemLore(ItemStack item, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasLore()) {
@@ -319,6 +362,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
+    // Отдельная строка: lore-1, lore-2, ... lore-100
     private String getLoreLine(ItemStack item, String type, String fallback) {
         try {
             int lineNum = Integer.parseInt(type.substring(5)) - 1;
@@ -334,7 +378,89 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    private String getEnchantments(ItemStack item, boolean raw, String fallback) {
+    // Кастомный лор: lore_1,2,3_slot_fallback
+    private String getCustomLore(ItemStack item, String loreParams, String fallback) {
+        if (loreParams == null || loreParams.isEmpty()) return fallback;
+        
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasLore()) return fallback;
+        
+        List<String> lore = meta.getLore();
+        if (lore.isEmpty()) return fallback;
+        
+        String delimiter = detectDelimiter(loreParams);
+        List<Integer> lineNumbers = parseLineNumbers(loreParams, delimiter);
+        if (lineNumbers.isEmpty()) return fallback;
+        
+        List<String> selectedLines = new ArrayList<>();
+        for (int num : lineNumbers) {
+            if (num >= 1 && num <= lore.size()) {
+                selectedLines.add(lore.get(num - 1));
+            }
+        }
+        
+        if (selectedLines.isEmpty()) return fallback;
+        
+        if ("\n".equals(delimiter)) {
+            return String.join("\n", selectedLines);
+        }
+        
+        return String.join(delimiter, selectedLines);
+    }
+    
+    private String detectDelimiter(String params) {
+        if (params.contains("\n")) return "\n";
+        
+        for (char c : params.toCharArray()) {
+            if (!Character.isDigit(c) && c != '-') {
+                return String.valueOf(c);
+            }
+        }
+        
+        return ",";
+    }
+    
+    private List<Integer> parseLineNumbers(String params, String delimiter) {
+        List<Integer> numbers = new ArrayList<>();
+        
+        String[] tokens;
+        if ("\n".equals(delimiter)) {
+            tokens = params.split("\n");
+        } else {
+            tokens = params.split(Pattern.quote(delimiter));
+        }
+        
+        for (String token : tokens) {
+            token = token.trim();
+            if (token.isEmpty()) continue;
+            
+            if (token.contains("-")) {
+                String[] range = token.split("-");
+                if (range.length == 2) {
+                    try {
+                        int start = Integer.parseInt(range[0].trim());
+                        int end = Integer.parseInt(range[1].trim());
+                        for (int i = Math.min(start, end); i <= Math.max(start, end); i++) {
+                            if (!numbers.contains(i)) {
+                                numbers.add(i);
+                            }
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            } else {
+                try {
+                    int num = Integer.parseInt(token);
+                    if (!numbers.contains(num)) {
+                        numbers.add(num);
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        
+        return numbers;
+    }
+    
+    private String getEnchantments(ItemStack item, boolean raw, boolean i18n, String fallback) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasEnchants()) {
             Map<Enchantment, Integer> enchants = meta.getEnchants();
@@ -344,9 +470,16 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             
             List<String> enchantList = new ArrayList<>();
             enchants.forEach((enchant, level) -> {
-                String enchantName = raw ? enchant.getKey().getKey().toLowerCase() : 
-                    formatEnchantmentName(enchant);
-                enchantList.add(raw ? enchantName + level : enchantName + " " + toRoman(level));
+                String enchantName;
+                if (i18n) {
+                    enchantName = getI18nEnchantmentName(enchant);
+                    if (raw) enchantName = stripColor(enchantName);
+                } else {
+                    enchantName = raw ? enchant.getKey().getKey().toLowerCase() : 
+                        formatEnchantmentName(enchant);
+                }
+                String levelStr = raw ? String.valueOf(level) : " " + toRoman(level);
+                enchantList.add(enchantName + levelStr);
             });
             
             return raw ? String.join(",", enchantList) : String.join(", ", enchantList);
@@ -354,7 +487,7 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
         return fallback;
     }
     
-    private String getPotionEffects(ItemStack item, boolean raw, String fallback) {
+    private String getPotionEffects(ItemStack item, boolean raw, boolean i18n, String fallback) {
         if (item.getItemMeta() instanceof PotionMeta potionMeta) {
             List<PotionEffect> effects = potionMeta.getCustomEffects();
             if (effects.isEmpty()) {
@@ -363,15 +496,40 @@ public class CheckSlotExpansion extends PlaceholderExpansion {
             
             List<String> effectList = new ArrayList<>();
             for (PotionEffect effect : effects) {
-                String effectName = raw ? effect.getType().getKey().getKey().toLowerCase() :
-                    formatPotionEffectName(effect.getType());
+                String effectName;
+                if (i18n) {
+                    effectName = getI18nPotionEffectName(effect.getType());
+                    if (raw) effectName = stripColor(effectName);
+                } else {
+                    effectName = raw ? effect.getType().getKey().getKey().toLowerCase() :
+                        formatPotionEffectName(effect.getType());
+                }
                 int amplifier = effect.getAmplifier() + 1;
-                effectList.add(raw ? effectName + amplifier : effectName + " " + toRoman(amplifier));
+                String levelStr = raw ? String.valueOf(amplifier) : " " + toRoman(amplifier);
+                effectList.add(effectName + levelStr);
             }
             
             return raw ? String.join(",", effectList) : String.join(", ", effectList);
         }
         return fallback;
+    }
+    
+    private String getI18nEnchantmentName(Enchantment enchant) {
+        try {
+            Component displayName = enchant.displayName(1);
+            return LegacyComponentSerializer.legacySection().serialize(displayName);
+        } catch (NoSuchMethodError e) {
+            return formatEnchantmentName(enchant);
+        }
+    }
+    
+    private String getI18nPotionEffectName(PotionEffectType type) {
+        try {
+            Component displayName = type.displayName();
+            return LegacyComponentSerializer.legacySection().serialize(displayName);
+        } catch (NoSuchMethodError e) {
+            return formatPotionEffectName(type);
+        }
     }
     
     private String getAttributes(ItemStack item, boolean raw, String fallback) {
